@@ -4,12 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:create": "wrangler d1 create traccar-db",
-    "db:init": "wrangler d1 execute traccar-db --local --file=schema.sql",
-    "db:init:remote": "wrangler d1 execute traccar-db --remote --file=schema.sql",
-    "build:frontend": "bash build-frontend.sh",
-    "predeploy": "npm run build:frontend"
+    "deploy": "bash build-frontend.sh && wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "build:frontend": "bash build-frontend.sh"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250410.0",

@@ -2,61 +2,68 @@
 
 Traccar-compatible GPS tracking server running on Cloudflare Workers. Uses the official [traccar-web](https://github.com/traccar/traccar-web) React frontend and implements the Traccar REST API + OsmAnd HTTP ingestion protocol.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/nkuntz1934/traccar-worker)
+
 ## Stack
 
-- **Cloudflare Workers** — API backend + request routing
-- **Workers Static Assets** — serves the traccar-web React SPA
-- **D1** — SQLite database (devices, positions, users, sessions, geofences)
-- **Durable Objects** — WebSocket hub with hibernation for real-time position updates
+- **Cloudflare Workers** -- API backend + request routing
+- **Workers Static Assets** -- serves the traccar-web React SPA
+- **D1** -- SQLite database (devices, positions, users, sessions, geofences)
+- **Durable Objects** -- WebSocket hub with hibernation for real-time position updates
 
-## Prerequisites
+## One-click deploy
 
-- Node.js 18+
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (`npm install -g wrangler`)
-- Cloudflare account with Workers, D1, and Durable Objects enabled
-- `wrangler login` completed
+Click the button above. Cloudflare will fork the repo, provision a D1 database and Durable Object, build the frontend, run migrations, and deploy.
 
-## Setup
+After deployment:
 
-### 1. Create D1 database
+1. Open the worker URL shown in your Cloudflare dashboard
+2. Log in with `admin@example.com` / `admin`
+3. Change the password in settings
+4. (Optional) Add a custom domain under Worker Settings > Triggers > Custom Domains
+
+## Manual setup
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/nkuntz1934/traccar-worker.git
+cd traccar-worker
+npm install
+```
+
+### 2. Create D1 database
 
 ```bash
 npx wrangler d1 create traccar-db
 ```
 
-Copy the `database_id` from the output into `wrangler.jsonc`.
+Copy the `database_id` into `wrangler.jsonc`.
 
-### 2. Update `wrangler.jsonc`
-
-Set your `account_id` and the `database_id` from step 1. Update the custom domain in `routes` to match your domain.
-
-### 3. Initialize schema
+### 3. Build frontend and deploy
 
 ```bash
-npx wrangler d1 execute traccar-db --remote --file=schema.sql
+npm run deploy
 ```
 
-### 4. Build frontend
+This clones [traccar/traccar-web](https://github.com/traccar/traccar-web), builds it, applies D1 migrations, and deploys the worker.
 
-```bash
-npm install
-bash build-frontend.sh
+### 4. (Optional) Custom domain
+
+Add to `wrangler.jsonc`:
+
+```jsonc
+"routes": [
+  { "pattern": "traccar.yourdomain.com", "custom_domain": true }
+]
 ```
 
-This clones [traccar/traccar-web](https://github.com/traccar/traccar-web), builds it, and copies the output to `frontend/build/`.
-
-### 5. Deploy
-
-```bash
-npx wrangler deploy
-```
+Then redeploy with `npx wrangler deploy`.
 
 ## Default credentials
 
-- **Email:** `admin@example.com` (change in `schema.sql` before init)
+- **Email:** `admin@example.com` (change in `migrations/0001_initial.sql` before first deploy)
 - **Password:** `admin`
-
-Change the password after first login.
 
 ## GPS device ingestion
 
@@ -67,13 +74,13 @@ Devices send position data via the OsmAnd HTTP protocol to the `/ingest` endpoin
 Set **Server URL** to:
 
 ```
-https://your-domain.example/ingest
+https://your-worker.your-subdomain.workers.dev/ingest
 ```
 
 ### curl
 
 ```bash
-curl "https://your-domain.example/ingest?id=DEVICE1&lat=38.89&lon=-77.03&timestamp=$(date +%s)&speed=0"
+curl "https://your-worker.your-subdomain.workers.dev/ingest?id=DEVICE1&lat=38.89&lon=-77.03&timestamp=$(date +%s)&speed=0"
 ```
 
 Devices are auto-created on first report and linked to the admin user.
@@ -82,13 +89,13 @@ Devices are auto-created on first report and linked to the admin user.
 
 ```
 GPS Device (Traccar Client / OsmAnd)
-  → POST /ingest?id=X&lat=Y&lon=Z
-  → Worker: parse OsmAnd protocol → D1 insert → Durable Object broadcast
+  -> POST /ingest?id=X&lat=Y&lon=Z
+  -> Worker: parse OsmAnd protocol -> D1 insert -> Durable Object broadcast
 
 Browser (traccar-web SPA)
-  → Static assets from Workers Static Assets
-  → REST API: /api/server, /api/session, /api/devices, /api/positions, ...
-  → WebSocket: /api/socket → Durable Object for real-time updates
+  -> Static assets from Workers Static Assets
+  -> REST API: /api/server, /api/session, /api/devices, /api/positions, ...
+  -> WebSocket: /api/socket -> Durable Object for real-time updates
 ```
 
 ## API endpoints
@@ -114,34 +121,35 @@ Browser (traccar-web SPA)
 
 ```
 src/
-  index.ts          — Main router: OsmAnd → API → WebSocket → SPA fallback
-  types.ts          — TypeScript interfaces and Env bindings
-  auth.ts           — PBKDF2 password hashing, session management, row mappers
-  osmand.ts         — OsmAnd protocol parser (query params + JSON body)
-  tracker-hub.ts    — Durable Object: WebSocket hibernation + broadcast
+  index.ts          -- Main router: OsmAnd -> API -> WebSocket -> SPA fallback
+  types.ts          -- TypeScript interfaces and Env bindings
+  auth.ts           -- PBKDF2 password hashing, session management, row mappers
+  osmand.ts         -- OsmAnd protocol parser (query params + JSON body)
+  tracker-hub.ts    -- Durable Object: WebSocket hibernation + broadcast
   api/
-    server.ts       — GET/PUT /api/server
-    session.ts      — POST/GET/DELETE /api/session
-    devices.ts      — CRUD /api/devices
-    positions.ts    — GET /api/positions, GPX/KML export
-    users.ts        — CRUD /api/users
-    geofences.ts    — CRUD /api/geofences
-    groups.ts       — CRUD /api/groups
-    permissions.ts  — POST/DELETE /api/permissions
-    reports.ts      — GET /api/reports/* (route, events, trips, stops, summary)
-    commands.ts     — GET/POST /api/commands
+    server.ts       -- GET/PUT /api/server
+    session.ts      -- POST/GET/DELETE /api/session
+    devices.ts      -- CRUD /api/devices
+    positions.ts    -- GET /api/positions, GPX/KML export
+    users.ts        -- CRUD /api/users
+    geofences.ts    -- CRUD /api/geofences
+    groups.ts       -- CRUD /api/groups
+    permissions.ts  -- POST/DELETE /api/permissions
+    reports.ts      -- GET /api/reports/* (route, events, trips, stops, summary)
+    commands.ts     -- GET/POST /api/commands
     notifications.ts
     drivers.ts
     maintenances.ts
     calendars.ts
-schema.sql          — D1 database schema + default admin user
-wrangler.jsonc      — Cloudflare Workers configuration
-build-frontend.sh   — Clone + build traccar-web
+migrations/
+  0001_initial.sql  -- D1 schema + default data
+wrangler.jsonc      -- Cloudflare Workers configuration
+build-frontend.sh   -- Clone + build traccar-web
 ```
 
 ## Regenerating the admin password hash
 
-The default password hash in `schema.sql` is PBKDF2 (100k iterations, SHA-256). To generate a new one:
+The default password hash is PBKDF2 (100k iterations, SHA-256). To generate a new one:
 
 ```bash
 node -e "
@@ -153,4 +161,4 @@ crypto.pbkdf2('YOUR_PASSWORD', salt, 100000, 32, 'sha256', (err, hash) => {
 "
 ```
 
-Replace the hash in the `INSERT INTO users` statement in `schema.sql`.
+Replace the hash in `migrations/0001_initial.sql`.
