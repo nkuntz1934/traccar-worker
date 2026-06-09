@@ -3,6 +3,11 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-04-01",
   "compatibility_flags": ["nodejs_compat"],
+  "account_id": "870e8509c92b6115e64a0cd8bb95ea97",
+
+  "routes": [
+    { "pattern": "traccar.easydemo.org", "custom_domain": true }
+  ],
 
   "assets": {
     "directory": "./frontend/build",
@@ -14,7 +19,7 @@
     {
       "binding": "DB",
       "database_name": "traccar-db",
-      "database_id": "",
+      "database_id": "70983951-413f-46b6-a795-e320e5cb5622",
       "migrations_dir": "migrations"
     }
   ],
